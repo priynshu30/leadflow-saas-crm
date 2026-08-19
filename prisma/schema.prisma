@@ -1,0 +1,234 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum BusinessType {
+  REAL_ESTATE
+  AUTOMOBILE
+  INSURANCE
+  INTERIOR_DESIGN
+  LOAN_FINANCE
+  SOLAR
+  PHOTOGRAPHY
+  EDUCATION
+  OTHER
+}
+
+enum BusinessStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  FOLLOW_UP
+  SITE_VISIT
+  CONVERTED
+  LOST
+}
+
+enum FollowUpStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
+model SuperAdmin {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Business {
+  id                 Int            @id @default(autoincrement())
+  name               String
+  phone              String?
+  email              String?
+  address            String?
+  businessType       BusinessType   @default(OTHER)
+  status             BusinessStatus @default(ACTIVE)
+  plan               String         @default("FREE")
+  field1Label        String?
+  field2Label        String?
+  field3Label        String?
+  field4Label        String?
+  defaultCountryCode String?        @default("91")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  users              User[]
+  leads              Lead[]
+  notifications      Notification[]
+  emailMessages      EmailMessage[]
+  loginLogs          LoginLog[]
+
+  @@index([status])
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  businessId    Int
+  name          String
+  email         String         @unique
+  phone         String?
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  business      Business       @relation(fields: [businessId], references: [id])
+  leads         Lead[]
+  followUps     FollowUp[]
+  activities    LeadActivity[]
+  notifications Notification[]
+  loginLogs     LoginLog[]
+
+  @@index([businessId])
+}
+
+model LoginLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int?
+  businessId Int?
+  email      String
+  success    Boolean
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  business   Business? @relation(fields: [businessId], references: [id])
+  user       User?     @relation(fields: [userId], references: [id])
+
+  @@index([businessId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([email])
+}
+
+model Lead {
+  id             Int        @id @default(autoincrement())
+  businessId     Int
+  assignedUserId Int?
+
+  name           String
+  phone          String
+  email          String?
+  alternatePhone String?
+
+  source         String?
+  status         LeadStatus @default(NEW)
+
+  field1Label    String?
+  field1Value    String?
+  field2Label    String?
+  field2Value    String?
+  field3Label    String?
+  field3Value    String?
+  field4Label    String?
+  field4Value    String?
+
+  notes          String?
+  nextFollowupAt DateTime?
+
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  business       Business       @relation(fields: [businessId], references: [id])
+  assignedUser   User?          @relation(fields: [assignedUserId], references: [id])
+  followUps      FollowUp[]
+  activities     LeadActivity[]
+  emailMessages  EmailMessage[]
+
+  @@index([businessId])
+  @@index([phone])
+  @@index([status])
+  @@index([nextFollowupAt])
+  @@index([businessId, phone]) // for duplicate-detection lookups
+}
+
+model FollowUp {
+  id          Int            @id @default(autoincrement())
+  leadId      Int
+  userId      Int
+  scheduledAt DateTime
+  status      FollowUpStatus @default(PENDING)
+  note        String?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  lead        Lead @relation(fields: [leadId], references: [id])
+  user        User @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([scheduledAt])
+}
+
+model LeadActivity {
+  id          Int      @id @default(autoincrement())
+  leadId      Int
+  userId      Int
+  type        String   // "CALL" | "WHATSAPP" | "EMAIL" | "STATUS_CHANGE" | "NOTE" | "LEAD_CREATED"
+  description String
+  createdAt   DateTime @default(now())
+
+  lead        Lead @relation(fields: [leadId], references: [id])
+  user        User @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  businessId Int
+  userId     Int
+  title      String
+  message    String
+  type       String   // "FOLLOW_UP" | "EMAIL" | "LEAD" | "SYSTEM"
+  link       String?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  business   Business @relation(fields: [businessId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([businessId, userId])
+  @@index([read])
+}
+
+model EmailMessage {
+  id         Int      @id @default(autoincrement())
+  businessId Int
+  leadId     Int?
+  fromEmail  String
+  fromName   String?
+  toEmail    String
+  subject    String
+  body       String
+  direction  String   @default("INBOUND") // "INBOUND" | "OUTBOUND"
+  status     String   @default("UNREAD")  // "UNREAD" | "READ" | "REPLIED"
+  createdAt  DateTime @default(now())
+
+  business   Business @relation(fields: [businessId], references: [id])
+  lead       Lead?    @relation(fields: [leadId], references: [id])
+
+  @@index([businessId])
+  @@index([status])
+}
+
+model ReminderLog {
+  id         Int      @id @default(autoincrement())
+  businessId Int
+  sentAt     DateTime @default(now())
+  channel    String   // "WHATSAPP" | "SMS"
+  status     String   // "SENT" | "FAILED"
+}
