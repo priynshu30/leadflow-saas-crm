@@ -114,8 +114,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onOpenQuickAdd }) => {
       <div className="p-3 border-t border-slate-100">
         <div className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold uppercase shrink-0">
-              {user?.name?.[0] || "U"}
+            <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold uppercase shrink-0 overflow-hidden">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover" />
+              ) : (
+                <span>{user?.name?.[0] || "U"}</span>
+              )}
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold text-slate-900 truncate">{user?.name || "User"}</p>

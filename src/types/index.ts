@@ -34,6 +34,8 @@ export interface SessionUser {
   name: string;
   businessName: string;
   businessType: BusinessType;
+  avatarUrl?: string | null;
+  phone?: string | null;
 }
 
 export interface BusinessSettings {

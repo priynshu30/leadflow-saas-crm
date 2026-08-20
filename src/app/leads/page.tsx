@@ -2,20 +2,34 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import { LeadTable } from "@/components/leads/LeadTable";
 import { LeadCard } from "@/components/leads/LeadCard";
+import { KanbanBoard } from "@/components/leads/KanbanBoard";
 import { LeadFilters } from "@/components/leads/LeadFilters";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TableSkeleton } from "@/components/ui/LoadingSkeleton";
 import { Button } from "@/components/ui/Button";
 import { ExcelImportModal } from "@/components/leads/ExcelImportModal";
-import { LeadWithRelations } from "@/types";
-import { Plus, Users, LayoutGrid, List, FileSpreadsheet } from "lucide-react";
+import { WhatsAppTemplateModal } from "@/components/leads/WhatsAppTemplateModal";
+import { useToast } from "@/components/ui/Toast";
+import { LeadWithRelations, LeadStatus } from "@/types";
+import {
+  Plus,
+  Users,
+  LayoutGrid,
+  List,
+  Kanban,
+  FileSpreadsheet,
+  Download,
+} from "lucide-react";
 
 export default function LeadsPage() {
+  const { showToast } = useToast();
   const [leads, setLeads] = useState<LeadWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [whatsAppModalLead, setWhatsAppModalLead] = useState<LeadWithRelations | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [source, setSource] = useState("");
@@ -24,14 +38,15 @@ export default function LeadsPage() {
     total: 0,
     totalPages: 1,
   });
-  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [viewMode, setViewMode] = useState<"table" | "grid" | "kanban">("table");
 
   const fetchLeads = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
       params.set("page", page.toString());
-      params.set("limit", "25");
+      // Increase limit for Kanban to show full pipeline
+      params.set("limit", viewMode === "kanban" ? "100" : "25");
       if (search.trim()) params.set("search", search.trim());
       if (status) params.set("status", status);
       if (source) params.set("source", source);
@@ -50,7 +65,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, status, source]);
+  }, [page, search, status, source, viewMode]);
 
   useEffect(() => {
     fetchLeads();
@@ -59,58 +74,147 @@ export default function LeadsPage() {
     return () => window.removeEventListener("lead-added", handleLeadAdded);
   }, [fetchLeads]);
 
+  // Kanban Drag-and-drop status update
+  const handleStatusChange = async (leadId: number, newStatus: LeadStatus) => {
+    // Optimistic UI update
+    setLeads((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status: newStatus } : l))
+    );
+
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update lead status");
+      }
+      showToast(`Lead moved to ${newStatus.replace(/_/g, " ")}`, "success");
+    } catch (err: any) {
+      showToast(err.message || "Status update failed", "error");
+      fetchLeads(); // Revert on failure
+    }
+  };
+
+  // 1-Click Excel Export
+  const handleExportExcel = () => {
+    if (leads.length === 0) {
+      showToast("No leads to export", "error");
+      return;
+    }
+
+    try {
+      const exportData = leads.map((l) => ({
+        "Lead ID": l.id,
+        "Full Name": l.name,
+        Phone: l.phone,
+        Email: l.email || "N/A",
+        Source: l.source || "N/A",
+        Status: l.status,
+        [l.field1Label || "Requirement"]: l.field1Value || "",
+        [l.field2Label || "Location"]: l.field2Value || "",
+        [l.field3Label || "Details"]: l.field3Value || "",
+        [l.field4Label || "Budget"]: l.field4Value || "",
+        "Next Followup": l.nextFollowupAt
+          ? new Date(l.nextFollowupAt).toLocaleString("en-IN")
+          : "None",
+        "Created At": new Date(l.createdAt).toLocaleString("en-IN"),
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
+      XLSX.writeFile(workbook, `LeadFlow_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast("Exported leads to Excel successfully!", "success");
+    } catch (e) {
+      showToast("Failed to export Excel file", "error");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Leads</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Leads & Pipeline</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Total {pagination.total} leads in database
+            Total {pagination.total} leads in database • Interactive Kanban Pipeline
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* View toggle (desktop) */}
-          <div className="hidden sm:flex items-center rounded-lg border border-slate-200 bg-white p-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View toggle (desktop & tablet) */}
+          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
             <button
               onClick={() => setViewMode("table")}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === "table" ? "bg-slate-100 text-slate-900" : "text-slate-400 hover:text-slate-600"
+              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
+                viewMode === "table"
+                  ? "bg-indigo-600 text-white shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900"
               }`}
               title="Table View"
             >
-              <List className="h-4 w-4" />
+              <List className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Table</span>
+            </button>
+            <button
+              onClick={() => setViewMode("kanban")}
+              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
+                viewMode === "kanban"
+                  ? "bg-indigo-600 text-white shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+              title="Kanban Pipeline View"
+            >
+              <Kanban className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Kanban</span>
             </button>
             <button
               onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === "grid" ? "bg-slate-100 text-slate-900" : "text-slate-400 hover:text-slate-600"
+              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
+                viewMode === "grid"
+                  ? "bg-indigo-600 text-white shadow-2xs"
+                  : "text-slate-500 hover:text-slate-900"
               }`}
               title="Grid View"
             >
-              <LayoutGrid className="h-4 w-4" />
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Grid</span>
             </button>
           </div>
 
+          {/* Export to Excel */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExportExcel}
+            title="Download Excel Sheet"
+            className="shadow-2xs"
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5 text-indigo-600" /> Export Excel
+          </Button>
+
+          {/* Import Excel */}
           <Button
             size="sm"
             variant="outline"
             onClick={() => setIsImportModalOpen(true)}
-            className="hidden sm:inline-flex"
+            className="hidden sm:inline-flex shadow-2xs"
           >
-            <FileSpreadsheet className="h-4 w-4 mr-1.5 text-emerald-600" /> Import Excel
+            <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5 text-emerald-600" /> Import
           </Button>
 
           <Link href="/leads/new">
-            <Button size="sm">
+            <Button size="sm" className="shadow-2xs">
               <Plus className="h-4 w-4 mr-1.5" /> Add Lead
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Search & Filters */}
+      {/* Search & Filters (Shown on Table/Grid or Kanban) */}
       <LeadFilters
         search={search}
         onSearchChange={(s) => {
@@ -154,27 +258,50 @@ export default function LeadsPage() {
         />
       ) : (
         <div className="space-y-4">
-          {/* Mobile view: always cards. Desktop: Table or Grid */}
-          <div className="block sm:hidden space-y-3">
-            {leads.map((lead) => (
-              <LeadCard key={lead.id} lead={lead} />
-            ))}
-          </div>
-
-          <div className="hidden sm:block">
-            {viewMode === "table" ? (
-              <LeadTable leads={leads} />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Kanban Pipeline View */}
+          {viewMode === "kanban" ? (
+            <KanbanBoard
+              leads={leads}
+              onStatusChange={handleStatusChange}
+              onOpenWhatsAppModal={(lead) => setWhatsAppModalLead(lead)}
+            />
+          ) : (
+            <>
+              {/* Mobile View: Cards */}
+              <div className="block sm:hidden space-y-3">
                 {leads.map((lead) => (
-                  <LeadCard key={lead.id} lead={lead} />
+                  <LeadCard
+                    key={lead.id}
+                    lead={lead}
+                    onOpenWhatsAppModal={(l) => setWhatsAppModalLead(l)}
+                  />
                 ))}
               </div>
-            )}
-          </div>
 
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
+              {/* Desktop View: Table or Grid */}
+              <div className="hidden sm:block">
+                {viewMode === "table" ? (
+                  <LeadTable
+                    leads={leads}
+                    onOpenWhatsAppModal={(l) => setWhatsAppModalLead(l)}
+                  />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {leads.map((lead) => (
+                      <LeadCard
+                        key={lead.id}
+                        lead={lead}
+                        onOpenWhatsAppModal={(l) => setWhatsAppModalLead(l)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Pagination (for table/grid) */}
+          {viewMode !== "kanban" && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 border-t border-slate-200">
               <span className="text-xs text-slate-500">
                 Page {page} of {pagination.totalPages}
@@ -208,6 +335,14 @@ export default function LeadsPage() {
         onClose={() => setIsImportModalOpen(false)}
         onSuccess={fetchLeads}
       />
+
+      {/* WhatsApp Template Modal */}
+      <WhatsAppTemplateModal
+        isOpen={!!whatsAppModalLead}
+        onClose={() => setWhatsAppModalLead(null)}
+        lead={whatsAppModalLead}
+      />
     </div>
   );
 }
+

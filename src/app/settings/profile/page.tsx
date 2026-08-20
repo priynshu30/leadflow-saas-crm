@@ -13,6 +13,7 @@ export default function ProfilePage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [loading, setLoading] = useState(true);
@@ -30,6 +31,8 @@ export default function ProfilePage() {
         if (data.user) {
           setName(data.user.name || "");
           setEmail(data.user.email || "");
+          setPhone(data.user.phone || "");
+          setAvatarUrl(data.user.avatarUrl || null);
           setBusinessName(data.user.businessName || "");
           setBusinessType(data.user.businessType || "");
         }
@@ -42,6 +45,27 @@ export default function ProfilePage() {
     fetchProfile();
   }, []);
 
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("Please choose an image under 2MB", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const base64 = uploadEvent.target?.result as string;
+      setAvatarUrl(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = () => {
+    setAvatarUrl(null);
+  };
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -52,8 +76,11 @@ export default function ProfilePage() {
 
     setSaving(true);
     try {
-      const payload: any = { name: name.trim() };
-      if (phone) payload.phone = phone.trim();
+      const payload: any = { 
+        name: name.trim(),
+        avatarUrl: avatarUrl,
+      };
+      if (phone !== undefined) payload.phone = phone.trim();
       if (newPassword) {
         payload.currentPassword = currentPassword;
         payload.newPassword = newPassword;
@@ -70,7 +97,7 @@ export default function ProfilePage() {
         throw new Error(data.error || "Failed to update profile");
       }
 
-      showToast("Profile updated successfully!", "success");
+      showToast("Profile and photo updated successfully!", "success");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -97,28 +124,63 @@ export default function ProfilePage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Account & Profile</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Check login email, organization details, and credentials</p>
+          <p className="text-xs text-slate-500 mt-0.5">Manage your photo, login email, workspace and credentials</p>
         </div>
       </div>
 
       <Card>
         <form onSubmit={handleUpdateProfile} className="space-y-6">
-          {/* Organization & Email Summary Banner */}
-          <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
-            <div className="h-14 w-14 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl font-bold uppercase shadow-sm shrink-0">
-              {name?.[0] || "U"}
+          {/* Profile Photo & Banner */}
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50/70 via-slate-50 to-slate-50 border border-indigo-100/60 flex flex-col sm:flex-row items-center gap-5">
+            <div className="relative group">
+              <div className="h-20 w-20 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-2xl font-bold uppercase shadow-md overflow-hidden border-2 border-white ring-2 ring-indigo-200">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
+                ) : (
+                  <span>{name?.[0] || "U"}</span>
+                )}
+              </div>
+              <label
+                htmlFor="avatar-upload"
+                className="absolute -bottom-1.5 -right-1.5 p-1.5 rounded-full bg-indigo-600 text-white shadow-md hover:bg-indigo-700 cursor-pointer transition-transform hover:scale-110 active:scale-95"
+                title="Upload photo"
+              >
+                <User className="h-3.5 w-3.5" />
+                <input
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+              </label>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-900 text-lg truncate">{name}</h3>
+
+            <div className="flex-1 text-center sm:text-left space-y-1">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <h3 className="font-bold text-slate-900 text-lg">{name || "Your Name"}</h3>
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
                   <CheckCircle2 className="h-3 w-3" /> Active
                 </span>
               </div>
-              <p className="text-xs text-slate-600 font-mono mt-0.5 truncate">{email}</p>
-              <p className="text-[11px] text-indigo-700 font-medium mt-1">
-                Workspace: <strong>{businessName}</strong> ({businessType.replace(/_/g, " ").toLowerCase()})
-              </p>
+              <p className="text-xs text-slate-600 font-mono">{email}</p>
+              <div className="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <label
+                  htmlFor="avatar-upload"
+                  className="cursor-pointer text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200/80 transition-colors"
+                >
+                  📷 Change Photo
+                </label>
+                {avatarUrl && (
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    className="text-xs font-semibold text-rose-600 hover:text-rose-800 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200/80 transition-colors"
+                  >
+                    Remove Photo
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

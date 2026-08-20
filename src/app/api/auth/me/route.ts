@@ -9,12 +9,29 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const business = await prisma.business.findUnique({
-      where: { id: session.businessId },
-    });
+    const [business, user] = await Promise.all([
+      prisma.business.findUnique({
+        where: { id: session.businessId },
+      }),
+      prisma.user.findUnique({
+        where: { id: session.userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          avatarUrl: true,
+        },
+      }),
+    ]);
 
     return NextResponse.json({
-      user: session,
+      user: {
+        ...session,
+        name: user?.name || session.name,
+        avatarUrl: user?.avatarUrl || null,
+        phone: user?.phone || null,
+      },
       business,
     });
   } catch (error) {

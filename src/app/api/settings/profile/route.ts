@@ -7,6 +7,7 @@ import { z } from "zod";
 const updateProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").optional(),
   phone: z.string().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
   currentPassword: z.string().optional(),
   newPassword: z.string().min(6, "New password must be at least 6 characters").optional(),
 });
@@ -28,6 +29,7 @@ export async function PATCH(req: NextRequest) {
     const updateData: any = {};
     if (validated.name) updateData.name = validated.name.trim();
     if (validated.phone !== undefined) updateData.phone = validated.phone?.trim() || null;
+    if (validated.avatarUrl !== undefined) updateData.avatarUrl = validated.avatarUrl;
 
     // Handle password change
     if (validated.newPassword) {
@@ -57,6 +59,7 @@ export async function PATCH(req: NextRequest) {
         name: true,
         email: true,
         phone: true,
+        avatarUrl: true,
         businessId: true,
       },
     });

@@ -3,10 +3,16 @@
 import React from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
-import { Building2, User, Sliders, ShieldCheck, ArrowRight, Bell } from "lucide-react";
+import { Building2, User, Sliders, ShieldCheck, ArrowRight, Users, Sparkles } from "lucide-react";
 
 export default function SettingsHubPage() {
   const sections = [
+    {
+      title: "Team & Sales Agents",
+      description: "Manage sales executives, view lead assignment workloads, and add new agents",
+      href: "/settings/team",
+      icon: Users,
+    },
     {
       title: "Business Profile & Niche Fields",
       description: "Customize your industry vertical and rename the 4 generic lead requirement fields",
@@ -14,8 +20,8 @@ export default function SettingsHubPage() {
       icon: Sliders,
     },
     {
-      title: "User Profile",
-      description: "Manage your personal account details, display name, and login credentials",
+      title: "User Profile & Photo",
+      description: "Manage your display name, profile photo, and password credentials",
       href: "/settings/profile",
       icon: User,
     },
@@ -57,6 +63,27 @@ export default function SettingsHubPage() {
           );
         })}
       </div>
+
+      {/* Account Session / Sign Out Section */}
+      <div className="pt-4 border-t border-slate-200">
+        <div className="p-4 rounded-2xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Active Account Session</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Sign out of your active session on this device</p>
+          </div>
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              window.location.href = "/login";
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors self-start sm:self-auto border border-rose-200/60"
+          >
+            <ShieldCheck className="h-4 w-4" />
+            <span>Sign out from CRM</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
+

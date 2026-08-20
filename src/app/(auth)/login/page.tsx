@@ -73,15 +73,25 @@ export default function LoginPage() {
               required
             />
 
-            <Input
-              label="Password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              leftIcon={<Lock className="h-4 w-4" />}
-              required
-            />
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700">Password</label>
+                <Link
+                  href="/forgot-password"
+                  className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                leftIcon={<Lock className="h-4 w-4" />}
+                required
+              />
+            </div>
 
             <Button type="submit" loading={loading} className="w-full mt-2" size="lg">
               Sign In <ArrowRight className="h-4 w-4 ml-1" />
@@ -91,31 +101,31 @@ export default function LoginPage() {
           {/* Quick Demo Accounts for Testing Multi-Tenancy */}
           <div className="mt-6 pt-5 border-t border-slate-100 space-y-2.5">
             <p className="text-xs font-bold text-slate-700 uppercase tracking-wider text-center">
-              1-Click Demo Accounts
+              1-Click Login Accounts
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail("admin@gmail.com");
+                  setPassword("Root@123");
+                }}
+                className="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/80 text-left transition-all"
+              >
+                <span className="font-bold text-xs text-indigo-900 block truncate">⚡ Priyanshu Kumar</span>
+                <span className="text-[10px] text-indigo-700 block">admin@gmail.com</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   setEmail("amit@apexrealty.in");
                   setPassword("password123");
                 }}
-                className="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/70 text-left transition-all"
-              >
-                <span className="font-bold text-xs text-indigo-900 block truncate">🏢 Apex Realty</span>
-                <span className="text-[10px] text-indigo-700 block">Real Estate Vertical</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("rohit@primeauto.com");
-                  setPassword("password123");
-                }}
                 className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-left transition-all"
               >
-                <span className="font-bold text-xs text-slate-900 block truncate">🚗 Prime Auto Hub</span>
-                <span className="text-[10px] text-slate-600 block">Automobile Dealership</span>
+                <span className="font-bold text-xs text-slate-900 block truncate">🏢 Apex Realty</span>
+                <span className="text-[10px] text-slate-600 block">amit@apexrealty.in</span>
               </button>
             </div>
           </div>

@@ -5,15 +5,17 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { LeadWithRelations } from "@/types";
-import { getWhatsAppLink, getCallLink, formatIndianPhone, formatDate } from "@/lib/utils";
-import { Phone, MessageSquare, Clock, ArrowUpRight } from "lucide-react";
+import { formatIndianPhone, formatDate, getCallLink } from "@/lib/utils";
+import { computeLeadScore } from "@/lib/leadScoring";
+import { Phone, MessageSquare, Clock, ArrowUpRight, Flame, Zap, Snowflake } from "lucide-react";
 
 interface LeadTableProps {
   leads: LeadWithRelations[];
   onStatusChange?: (leadId: number, newStatus: any) => void;
+  onOpenWhatsAppModal?: (lead: LeadWithRelations) => void;
 }
 
-export const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
+export const LeadTable: React.FC<LeadTableProps> = ({ leads, onOpenWhatsAppModal }) => {
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
       <div className="overflow-x-auto">
@@ -24,7 +26,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
                 Lead Name & Contact
               </th>
               <th scope="col" className="px-5 py-3.5">
-                Status
+                AI Score & Status
               </th>
               <th scope="col" className="px-5 py-3.5">
                 Requirement Details
@@ -39,10 +41,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
           </thead>
           <tbody className="divide-y divide-slate-100 font-normal">
             {leads.map((lead) => {
-              const whatsappUrl = getWhatsAppLink(
-                lead.phone,
-                `Hello ${lead.name}, regarding your requirement at LeadFlow...`
-              );
+              const aiScore = computeLeadScore(lead);
               const callUrl = getCallLink(lead.phone);
 
               return (
@@ -68,9 +67,26 @@ export const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
                     </div>
                   </td>
 
-                  {/* Status */}
+                  {/* Status & AI Score */}
                   <td className="px-5 py-4">
-                    <Badge status={lead.status} />
+                    <div className="flex flex-col gap-1.5 items-start">
+                      <Badge status={lead.status} />
+                      <span
+                        title={`AI Probability: ${aiScore.score}% (${aiScore.reasons.join(", ")})`}
+                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          aiScore.category === "HOT"
+                            ? "bg-rose-100 text-rose-700"
+                            : aiScore.category === "WARM"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {aiScore.category === "HOT" && <Flame className="h-2.5 w-2.5 text-rose-600" />}
+                        {aiScore.category === "WARM" && <Zap className="h-2.5 w-2.5 text-amber-600" />}
+                        {aiScore.category === "COLD" && <Snowflake className="h-2.5 w-2.5 text-slate-500" />}
+                        <span>{aiScore.label} ({aiScore.score}%)</span>
+                      </span>
+                    </div>
                   </td>
 
                   {/* Niche Requirement details */}
@@ -106,18 +122,17 @@ export const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
                     )}
                   </td>
 
-                  {/* Action buttons (WhatsApp + Call) */}
+                  {/* Action buttons (WhatsApp + Call + Details) */}
                   <td className="px-5 py-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      <a
-                        href={whatsappUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => onOpenWhatsAppModal?.(lead)}
                         className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all shadow-2xs"
-                        title="Chat on WhatsApp"
+                        title="Send WhatsApp Template"
                       >
                         <MessageSquare className="h-4 w-4" />
-                      </a>
+                      </button>
                       <a
                         href={callUrl}
                         className="inline-flex items-center justify-center h-8 w-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-2xs"
@@ -141,3 +156,4 @@ export const LeadTable: React.FC<LeadTableProps> = ({ leads }) => {
     </div>
   );
 };
+

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CompleteFollowUpModal } from "./CompleteFollowUpModal";
+import { GoogleCalendarButton } from "@/components/follow-ups/GoogleCalendarButton";
 import { getWhatsAppLink, getCallLink, formatIndianPhone, formatDateTime } from "@/lib/utils";
 import {
   CalendarClock,
@@ -198,6 +199,11 @@ export const FollowUpBuckets: React.FC<FollowUpBucketsProps> = ({
                           <Phone className="h-3.5 w-3.5" />
                           <span>Call</span>
                         </a>
+                        <GoogleCalendarButton
+                          title={`CRM Follow-up: ${lead.name}`}
+                          description={`Follow-up with ${lead.name} (${lead.phone}). Note: ${item.note || "Scheduled discussion"}`}
+                          startDate={item.scheduledAt}
+                        />
                       </>
                     )}
                   </div>
