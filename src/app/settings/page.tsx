@@ -10,7 +10,7 @@ export default function SettingsHubPage() {
     {
       title: "Team & Sales Agents",
       description: "Manage sales executives, view lead assignment workloads, and add new agents",
-      href: "/settings/team",
+      href: "/employees",
       icon: Users,
     },
     {
