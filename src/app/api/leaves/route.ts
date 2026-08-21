@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error("POST /api/leaves error:", error);
     return NextResponse.json(
-      { error: "Failed to submit leave request" },
+      { error: error?.message || "Failed to submit leave request" },
       { status: 500 }
     );
   }

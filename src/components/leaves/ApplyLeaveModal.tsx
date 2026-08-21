@@ -88,7 +88,14 @@ export function ApplyLeaveModal({
         }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(res.status === 401 ? "Session expired. Please log in again." : `Server error (${res.status})`);
+      }
+
       if (!res.ok) throw new Error(data.error || "Failed to submit leave request");
 
       showToast("✅ Leave request submitted to Company Owner!", "success");
