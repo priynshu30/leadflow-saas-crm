@@ -71,6 +71,7 @@ model Business {
   notifications      Notification[]
   emailMessages      EmailMessage[]
   loginLogs          LoginLog[]
+  fieldVisits        FieldVisit[]
 
   @@index([status])
 }
@@ -97,6 +98,7 @@ model User {
   loginLogs       LoginLog[]
   attendances     Attendance[]
   workProofs      WorkProof[]
+  fieldVisits     FieldVisit[]
 
   @@index([businessId])
 }
@@ -200,12 +202,55 @@ model Lead {
   followUps      FollowUp[]
   activities     LeadActivity[]
   emailMessages  EmailMessage[]
+  fieldVisits    FieldVisit[]
 
   @@index([businessId])
   @@index([phone])
   @@index([status])
   @@index([nextFollowupAt])
   @@index([businessId, phone]) // for duplicate-detection lookups
+}
+
+model FieldVisit {
+  id               Int       @id @default(autoincrement())
+  businessId       Int
+  userId           Int
+  leadId           Int?
+  clientName       String
+  clientPhone      String?
+  purpose          String    // "Site Visit", "Client Meeting", "Payment Collection", "Document Verification", "Demo / Pitch", "Other"
+  
+  // Check-In Details
+  checkInTime      DateTime  @default(now())
+  checkInLat       Float?
+  checkInLng       Float?
+  checkInLocation  String?
+  checkInPhotoUrl  String?   @db.MediumText
+
+  // Check-Out Details
+  checkOutTime     DateTime?
+  checkOutLat      Float?
+  checkOutLng      Float?
+  checkOutLocation String?
+  checkOutPhotoUrl String?   @db.MediumText
+  
+  // Meeting Outcome
+  durationMinutes  Int?
+  outcome          String?   // "INTERESTED", "DEAL_CLOSED", "NEEDS_FOLLOW_UP", "NOT_INTERESTED", "RESCHEDULED"
+  notes            String?   @db.Text
+  amountCollected  Float?
+  status           String    @default("IN_PROGRESS") // "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  business         Business  @relation(fields: [businessId], references: [id])
+  user             User      @relation(fields: [userId], references: [id])
+  lead             Lead?     @relation(fields: [leadId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@index([userId, createdAt])
+  @@index([leadId])
 }
 
 model FollowUp {

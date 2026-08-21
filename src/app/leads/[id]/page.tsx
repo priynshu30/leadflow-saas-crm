@@ -11,6 +11,7 @@ import { ActivityTimeline } from "@/components/leads/ActivityTimeline";
 import { CompleteFollowUpModal } from "@/components/followups/CompleteFollowUpModal";
 import { SendEmailModal } from "@/components/leads/SendEmailModal";
 import { WorkProofModal } from "@/components/attendance/WorkProofModal";
+import { StartVisitModal } from "@/components/visits/StartVisitModal";
 import { LeadWithRelations, LeadStatus, FollowUpItem } from "@/types";
 import { useToast } from "@/components/ui/Toast";
 import { getWhatsAppLink, getCallLink, formatIndianPhone, formatDateTime, formatDate } from "@/lib/utils";
@@ -58,6 +59,7 @@ export default function LeadDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { showToast } = useToast();
+  const [showStartVisit, setShowStartVisit] = useState(false);
   const leadId = params.id as string;
 
   const [lead, setLead] = useState<LeadWithRelations | null>(null);
@@ -234,6 +236,20 @@ export default function LeadDetailPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* Start Field Visit Modal */}
+      {showStartVisit && (
+        <StartVisitModal
+          isOpen={showStartVisit}
+          onClose={() => setShowStartVisit(false)}
+          onVisitStarted={() => {
+            showToast("✅ Field visit started for this client!", "success");
+          }}
+          defaultLeadId={lead.id}
+          defaultClientName={lead.name}
+          defaultClientPhone={lead.phone}
+        />
+      )}
+
       {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <Link
@@ -244,6 +260,13 @@ export default function LeadDetailPage() {
         </Link>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => setShowStartVisit(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+          >
+            <MapPin className="h-3.5 w-3.5 mr-1.5" /> Start Field Visit
+          </Button>
           <Button
             size="sm"
             onClick={() => setIsWorkProofModalOpen(true)}

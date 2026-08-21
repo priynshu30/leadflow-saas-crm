@@ -16,6 +16,7 @@ import {
   Inbox,
   Camera,
   UserCog,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SessionUser } from "@/types";
@@ -42,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onOpenQuickAdd }) => {
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Leads", href: "/leads", icon: Users },
     { label: "Follow-ups", href: "/follow-ups", icon: CalendarClock },
+    { label: "Field Visits", href: "/visits", icon: MapPin },
     { label: "Attendance", href: "/attendance", icon: Camera },
     ...(isAdmin ? [{ label: "Team", href: "/employees", icon: UserCog }] : []),
     { label: "Inbox", href: "/inbox", icon: Inbox },
