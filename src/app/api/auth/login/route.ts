@@ -14,16 +14,25 @@ export async function POST(req: NextRequest) {
       "127.0.0.1";
     const userAgent = req.headers.get("user-agent") || "unknown";
 
-    const user = await prisma.user.findUnique({
-      where: { email: validated.email.toLowerCase() },
+    const emailClean = validated.email.toLowerCase().trim();
+
+    let user = await prisma.user.findFirst({
+      where: { email: emailClean },
       include: { business: true },
     });
+
+    if (!user) {
+      user = await prisma.user.findFirst({
+        where: { email: { equals: emailClean, mode: "insensitive" } },
+        include: { business: true },
+      });
+    }
 
     if (!user) {
       // Log failed attempt (user not found)
       await prisma.loginLog.create({
         data: {
-          email: validated.email.toLowerCase(),
+          email: emailClean,
           success: false,
           ipAddress,
           userAgent,
