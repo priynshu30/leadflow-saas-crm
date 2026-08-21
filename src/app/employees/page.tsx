@@ -7,18 +7,18 @@ import {
   Eye,
   Plus,
   Trash2,
-  CheckCircle,
-  XCircle,
   Crown,
   UserCheck,
   Mail,
   RefreshCw,
   UserCog,
-  Check,
-  X,
+  KeyRound,
   Lock,
+  X,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
 import { InviteEmployeeModal } from "@/components/employees/InviteEmployeeModal";
 
@@ -42,6 +42,11 @@ export default function EmployeesPage() {
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
 
+  // Change Password Modal state
+  const [passwordModalEmp, setPasswordModalEmp] = useState<Employee | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
+
   const fetchEmployees = useCallback(async () => {
     setLoading(true);
     try {
@@ -53,7 +58,7 @@ export default function EmployeesPage() {
         const data = await empRes.json();
         setEmployees(data.employees || []);
       } else if (empRes.status === 403) {
-        showToast("Access denied. Admin only.", "error");
+        showToast("Access denied. Company Owner / Admins only.", "error");
       }
       if (sessionRes.ok) {
         const sData = await sessionRes.json();
@@ -115,9 +120,40 @@ export default function EmployeesPage() {
       );
       showToast(`Role updated to ${newRole === "ADMIN" ? "Administrator" : "Field Agent"}!`, "success");
     } catch (err: any) {
-      showToast(err.message, "error");
+      showToast(err.message || "Failed to update employee", "error");
     } finally {
       setUpdating(null);
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalEmp) return;
+    if (!newPassword || newPassword.trim().length < 6) {
+      showToast("Password must be at least 6 characters", "error");
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const res = await fetch("/api/employees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: passwordModalEmp.id,
+          password: newPassword.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to change password");
+
+      showToast(`Password successfully updated for ${passwordModalEmp.name}!`, "success");
+      setPasswordModalEmp(null);
+      setNewPassword("");
+    } catch (err: any) {
+      showToast(err.message || "Failed to update password", "error");
+    } finally {
+      setSavingPassword(false);
     }
   };
 
@@ -154,15 +190,81 @@ export default function EmployeesPage() {
     <>
       {showInvite && <InviteEmployeeModal onClose={() => setShowInvite(false)} onInvited={fetchEmployees} />}
 
+      {/* Change Password Modal */}
+      {passwordModalEmp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                  <KeyRound className="h-4 w-4 text-indigo-600" /> Set New Password
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Update login password for <strong>{passwordModalEmp.name}</strong> ({passwordModalEmp.email})
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setPasswordModalEmp(null);
+                  setNewPassword("");
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <Input
+                label="New Password *"
+                type="text"
+                placeholder="Enter new password (min 6 characters)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                leftIcon={<Lock className="h-4 w-4" />}
+                required
+              />
+
+              <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                💡 Only company owner can set or change employee passwords. Share this new password with the employee so they can log in.
+              </p>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1"
+                  size="sm"
+                  onClick={() => {
+                    setPasswordModalEmp(null);
+                    setNewPassword("");
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  loading={savingPassword}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Update Password
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6 max-w-5xl mx-auto">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <UserCog className="h-6 w-6 text-indigo-600" /> Team & Permission Management
+              <UserCog className="h-6 w-6 text-indigo-600" /> Team & Access Control
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Control which employees can view all leads, create leads, or act as admins
+              Only company owner can add members, manage passwords & grant lead permissions
             </p>
           </div>
           <div className="flex gap-2">
@@ -183,7 +285,7 @@ export default function EmployeesPage() {
           </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-2xs">
             <p className="text-2xl font-black text-amber-600">{admins.length}</p>
-            <p className="text-xs font-semibold text-slate-500 mt-0.5">Admins / Managers</p>
+            <p className="text-xs font-semibold text-slate-500 mt-0.5">Admins / Owners</p>
           </div>
           <div className="bg-white rounded-2xl border border-slate-200 p-4 text-center shadow-2xs">
             <p className="text-2xl font-black text-emerald-600">{agents.length}</p>
@@ -246,7 +348,7 @@ export default function EmployeesPage() {
                           >
                             {emp.role === "ADMIN" ? (
                               <>
-                                <Crown className="h-3 w-3" /> Admin
+                                <Crown className="h-3 w-3" /> Admin / Owner
                               </>
                             ) : (
                               <>
@@ -263,7 +365,21 @@ export default function EmployeesPage() {
 
                     {/* Actions if not self */}
                     {!isSelf && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Change Password Button */}
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setPasswordModalEmp(emp);
+                            setNewPassword("");
+                          }}
+                          className="text-xs border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                        >
+                          <KeyRound className="h-3.5 w-3.5 mr-1" /> Set Password
+                        </Button>
+
                         {/* Quick Role Switcher */}
                         <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200">
                           <button
@@ -332,7 +448,7 @@ export default function EmployeesPage() {
                               <p className="text-xs font-bold text-slate-900">View All Company Leads</p>
                               <p className="text-[11px] text-slate-500 mt-0.5">
                                 {emp.canViewAllLeads || emp.role === "ADMIN"
-                                  ? "✅ Enabled: Can see ALL leads across company"
+                                  ? "✅ Enabled: Can see ALL company leads"
                                   : "🔒 Disabled: Can ONLY see leads assigned to him"}
                               </p>
                             </div>
@@ -375,7 +491,7 @@ export default function EmployeesPage() {
                               <p className="text-xs font-bold text-slate-900">Create / Add New Leads</p>
                               <p className="text-[11px] text-slate-500 mt-0.5">
                                 {emp.canAddLeads || emp.role === "ADMIN"
-                                  ? "✅ Enabled: Can create new leads in CRM"
+                                  ? "✅ Enabled: Can add new leads to CRM"
                                   : "🔒 Disabled: Blocked from adding leads"}
                               </p>
                             </div>
@@ -399,7 +515,7 @@ export default function EmployeesPage() {
                   ) : (
                     <div className="pt-3 flex items-center gap-2 text-xs text-indigo-700 bg-indigo-50/70 px-3 py-2 rounded-xl mt-3">
                       <Shield className="h-4 w-4 text-indigo-600" />
-                      <span>You have Full Company Administrator access to all features, settings and leads.</span>
+                      <span>You have Full Company Owner access to all features, settings and team reports.</span>
                     </div>
                   )}
                 </div>
@@ -408,19 +524,23 @@ export default function EmployeesPage() {
           </div>
         )}
 
-        {/* Permissions Guide Banner */}
+        {/* Security & Access Guidelines */}
         <div className="bg-slate-900 text-white rounded-2xl p-5 shadow-sm space-y-3">
           <p className="text-xs font-bold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-            <Lock className="h-4 w-4 text-indigo-400" /> How Permissions Work in Practice
+            <Lock className="h-4 w-4 text-indigo-400" /> Security & Role Model
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-300">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-slate-300">
             <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
-              <strong className="text-white block mb-1">👀 "View All Leads" OFF:</strong>
-              When disabled, the agent logs in and only sees leads where they are the assigned agent. All other company leads are 100% hidden.
+              <strong className="text-white block mb-1">👑 Company Owner (You):</strong>
+              Can see all team SOD/EOD attendance, download Excel reports, re-assign leads, invite members & reset passwords.
             </div>
             <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
-              <strong className="text-white block mb-1">➕ "Add Leads" OFF:</strong>
-              When disabled, the agent cannot create leads or import lists. They can only work on existing leads assigned by the Admin.
+              <strong className="text-white block mb-1">👤 Field Agent (Employee):</strong>
+              Can only see their own attendance, their own assigned leads, and cannot view or edit other employees' data.
+            </div>
+            <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
+              <strong className="text-white block mb-1">🔑 Password Control:</strong>
+              Click "Set Password" next to any employee to set their password directly anytime.
             </div>
           </div>
         </div>

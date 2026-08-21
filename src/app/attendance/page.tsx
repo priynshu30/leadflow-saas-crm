@@ -324,14 +324,16 @@ export default function AttendancePage() {
             <p className="text-sm text-slate-500 mt-0.5">{format(new Date(), "EEEE, dd MMMM yyyy")}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleExportExcel}
-              className="border-slate-300 text-slate-700 hover:bg-slate-100"
-            >
-              <Download className="h-3.5 w-3.5 mr-1.5 text-slate-600" /> Export Attendance (Excel)
-            </Button>
+            {userRole === "ADMIN" && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExportExcel}
+                className="border-slate-300 text-slate-700 hover:bg-slate-100"
+              >
+                <Download className="h-3.5 w-3.5 mr-1.5 text-slate-600" /> Export Attendance (Excel)
+              </Button>
+            )}
             <Button onClick={() => setShowWorkProof(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
               <Plus className="h-3.5 w-3.5 mr-1.5" /> Log Work / Call Proof
             </Button>

@@ -45,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onOpenQuickAdd }) => {
     { label: "Attendance", href: "/attendance", icon: Camera },
     ...(isAdmin ? [{ label: "Team", href: "/employees", icon: UserCog }] : []),
     { label: "Inbox", href: "/inbox", icon: Inbox },
-    { label: "Reports", href: "/reports", icon: BarChart3 },
+    ...(isAdmin ? [{ label: "Reports", href: "/reports", icon: BarChart3 }] : []),
     { label: "Settings", href: "/settings", icon: Settings },
   ];
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 // GET - list all users in the same business (admin only)
 export async function GET(req: NextRequest) {
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// PATCH - update role and permissions (admin only)
+// PATCH - update role, permissions or password (admin only)
 export async function PATCH(req: NextRequest) {
   try {
     const session = await getSession();
@@ -47,7 +48,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { userId, role, canAddLeads, canViewAllLeads } = body;
+    const { userId, role, canAddLeads, canViewAllLeads, password } = body;
 
     if (!userId) return NextResponse.json({ error: "userId is required" }, { status: 400 });
 
@@ -58,13 +59,21 @@ export async function PATCH(req: NextRequest) {
 
     if (!targetUser) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
+    const dataToUpdate: any = {};
+    if (role !== undefined) dataToUpdate.role = role;
+    if (canAddLeads !== undefined) dataToUpdate.canAddLeads = Boolean(canAddLeads);
+    if (canViewAllLeads !== undefined) dataToUpdate.canViewAllLeads = Boolean(canViewAllLeads);
+
+    if (password && typeof password === "string" && password.trim().length > 0) {
+      if (password.trim().length < 6) {
+        return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
+      }
+      dataToUpdate.passwordHash = await bcrypt.hash(password.trim(), 10);
+    }
+
     const updated = await prisma.user.update({
       where: { id: Number(userId) },
-      data: {
-        ...(role !== undefined ? { role } : {}),
-        ...(canAddLeads !== undefined ? { canAddLeads: Boolean(canAddLeads) } : {}),
-        ...(canViewAllLeads !== undefined ? { canViewAllLeads: Boolean(canViewAllLeads) } : {}),
-      },
+      data: dataToUpdate,
       select: {
         id: true,
         name: true,
@@ -75,7 +84,11 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, user: updated });
+    return NextResponse.json({
+      success: true,
+      message: password ? "Password and details updated successfully!" : "Updated successfully!",
+      user: updated,
+    });
   } catch (error: any) {
     console.error("PATCH /api/employees error:", error);
     return NextResponse.json({ error: "Failed to update employee" }, { status: 500 });
