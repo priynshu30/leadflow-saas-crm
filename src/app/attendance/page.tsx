@@ -127,8 +127,14 @@ export default function AttendancePage() {
           sodLocationName: data.locationName,
         }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      const text = await res.text();
+      let result: any = {};
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error(res.status === 413 ? "Photo is too large. Please retake photo." : `Server error (${res.status})`);
+      }
+      if (!res.ok) throw new Error(result.error || "Failed to clock in");
       showToast("✅ Clocked In (SOD) with selfie & location!", "success");
       setShowSelfieCapture(null);
       fetchData();
@@ -160,8 +166,14 @@ export default function AttendancePage() {
           eodSummary,
         }),
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error);
+      const text = await res.text();
+      let result: any = {};
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error(res.status === 413 ? "Photo is too large. Please retake photo." : `Server error (${res.status})`);
+      }
+      if (!res.ok) throw new Error(result.error || "Failed to clock out");
       showToast("✅ Clocked Out (EOD) successfully!", "success");
       setShowEodSummary(false);
       setEodSummary("");

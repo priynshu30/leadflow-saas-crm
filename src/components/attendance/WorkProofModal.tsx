@@ -5,6 +5,7 @@ import { X, Camera, Mic, Square, Play, Pause, Upload, FileText, Music, CheckCirc
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
+import { compressImage } from "@/lib/imageUtils";
 
 interface WorkProofModalProps {
   isOpen: boolean;
@@ -70,19 +71,16 @@ export function WorkProofModal({
 
   if (!isOpen) return null;
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      showToast("Image must be under 8MB", "error");
-      return;
+    try {
+      const compressed = await compressImage(file, 800, 0.65);
+      setImageUrl(compressed);
+      showToast("Photo attached & optimized!", "success");
+    } catch {
+      showToast("Failed to process photo", "error");
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageUrl(reader.result as string);
-      showToast("Photo attached!", "success");
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleAudioFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

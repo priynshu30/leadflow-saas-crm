@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, MapPin, X, CheckCircle2, RefreshCw, Upload, Image as ImageIcon, Video } from "lucide-react";
+import { Camera, MapPin, X, CheckCircle2, RefreshCw, Upload, Video, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { compressImage } from "@/lib/imageUtils";
 
 interface SelfieLocationCaptureProps {
   onCapture: (data: { selfieUrl: string; lat: number | null; lng: number | null; locationName: string }) => void;
@@ -25,12 +26,12 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
   const [loadingGPS, setLoadingGPS] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [compressing, setCompressing] = useState(false);
 
   // Auto-fetch GPS on open
   useEffect(() => {
     getLocation();
     return () => {
-      // Clean up stream on unmount
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
@@ -41,7 +42,7 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
     setCameraError(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Webcam API not supported in this browser. Please use the 'Take Photo with Camera' button below.");
+        throw new Error("Webcam not directly supported in this browser. Please use the 'Open Phone Camera' button.");
       }
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
@@ -57,8 +58,8 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
       setCameraStarted(true);
     } catch (err: any) {
       console.warn("Camera start failed:", err);
-      setCameraError(err.message || "Camera access denied or unavailable.");
-      showToast("Webcam error. You can still use 'Upload / Take Photo' below.", "error");
+      setCameraError(err.message || "Camera access denied.");
+      showToast("Webcam error. Please use 'Open Phone Camera' below.", "error");
     }
   }, [showToast]);
 
@@ -70,48 +71,50 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
     setCameraStarted(false);
   }, [stream]);
 
-  const takeSelfie = useCallback(() => {
+  const takeSelfie = useCallback(async () => {
     if (!videoRef.current || !canvasRef.current) return;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const width = video.videoWidth || video.clientWidth || 640;
-    const height = video.videoHeight || video.clientHeight || 480;
+    const width = video.videoWidth || 640;
+    const height = video.videoHeight || 480;
 
     canvas.width = width;
     canvas.height = height;
     ctx.drawImage(video, 0, 0, width, height);
 
+    setCompressing(true);
     try {
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
-      setSelfieUrl(dataUrl);
+      const rawDataUrl = canvas.toDataURL("image/jpeg", 0.8);
+      const compressed = await compressImage(rawDataUrl, 640, 0.65);
+      setSelfieUrl(compressed);
       stopCamera();
-      showToast("Selfie captured successfully!", "success");
+      showToast("Selfie captured!", "success");
     } catch (err) {
-      showToast("Failed to capture frame from camera", "error");
+      showToast("Failed to process photo", "error");
+    } finally {
+      setCompressing(false);
     }
   }, [stopCamera, showToast]);
 
-  // Handle native camera or photo upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle native camera or photo upload with automatic compression
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 8 * 1024 * 1024) {
-      showToast("Photo must be under 8MB", "error");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setSelfieUrl(result);
+    setCompressing(true);
+    try {
+      const compressed = await compressImage(file, 640, 0.65);
+      setSelfieUrl(compressed);
       stopCamera();
-      showToast("Photo attached successfully!", "success");
-    };
-    reader.readAsDataURL(file);
+      showToast("Photo captured & optimized!", "success");
+    } catch (err) {
+      showToast("Failed to process image file", "error");
+    } finally {
+      setCompressing(false);
+    }
   };
 
   const getLocation = useCallback(() => {
@@ -164,7 +167,13 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
             <h2 className="font-bold text-slate-900 text-base">{title}</h2>
             {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
           </div>
-          <button onClick={() => { stopCamera(); onCancel(); }} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
+          <button
+            onClick={() => {
+              stopCamera();
+              onCancel();
+            }}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -172,7 +181,12 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
         <div className="p-5 space-y-4">
           {/* Photo / Camera Preview */}
           <div className="relative bg-slate-950 rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-slate-200 shadow-inner">
-            {selfieUrl ? (
+            {compressing ? (
+              <div className="flex flex-col items-center gap-2 text-white">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+                <span className="text-xs font-semibold">Processing photo...</span>
+              </div>
+            ) : selfieUrl ? (
               <img src={selfieUrl} alt="selfie preview" className="w-full h-full object-cover" />
             ) : cameraStarted ? (
               <video
@@ -189,7 +203,7 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
                 </div>
                 <p className="text-xs font-medium text-slate-300">Live Selfie Required</p>
                 <p className="text-[11px] text-slate-400 max-w-xs">
-                  Click 'Start Live Camera' or 'Take Photo / Upload' from your device
+                  Click 'Start Live Camera' or 'Open Phone Camera' below
                 </p>
                 {cameraError && (
                   <p className="text-[11px] text-rose-400 bg-rose-950/40 px-2.5 py-1 rounded-lg mt-1 border border-rose-800">
@@ -205,13 +219,20 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
           <div className="space-y-2">
             {!selfieUrl && !cameraStarted && (
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" onClick={startCamera} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                <Button
+                  type="button"
+                  onClick={startCamera}
+                  size="sm"
+                  disabled={compressing}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
                   <Video className="h-3.5 w-3.5 mr-1.5" /> Start Live Camera
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
+                  disabled={compressing}
                   onClick={() => cameraInputRef.current?.click()}
                   className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
                 >
@@ -222,7 +243,13 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
 
             {cameraStarted && !selfieUrl && (
               <div className="flex gap-2">
-                <Button type="button" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={takeSelfie} size="sm">
+                <Button
+                  type="button"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={takeSelfie}
+                  loading={compressing}
+                  size="sm"
+                >
                   <Camera className="h-3.5 w-3.5 mr-1.5" /> Capture Selfie Now
                 </Button>
                 <Button type="button" variant="secondary" size="sm" onClick={stopCamera}>
@@ -238,7 +265,11 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
                   variant="secondary"
                   className="flex-1"
                   size="sm"
-                  onClick={() => { setSelfieUrl(null); startCamera(); }}
+                  disabled={compressing}
+                  onClick={() => {
+                    setSelfieUrl(null);
+                    startCamera();
+                  }}
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retake Selfie
                 </Button>
@@ -246,6 +277,7 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
                   type="button"
                   variant="secondary"
                   size="sm"
+                  disabled={compressing}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="h-3.5 w-3.5 mr-1.5" /> Choose File
@@ -253,7 +285,7 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
               </div>
             )}
 
-            {/* Hidden native camera/file inputs for 100% reliability */}
+            {/* Hidden native camera/file inputs with auto-compression */}
             <input
               ref={cameraInputRef}
               type="file"
@@ -316,17 +348,20 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
             type="button"
             variant="secondary"
             className="flex-1"
-            onClick={() => { stopCamera(); onCancel(); }}
+            onClick={() => {
+              stopCamera();
+              onCancel();
+            }}
             size="sm"
           >
             Cancel
           </Button>
           <Button
             type="button"
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
             onClick={handleConfirm}
             size="sm"
-            disabled={!selfieUrl}
+            disabled={!selfieUrl || compressing}
           >
             <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Confirm & Submit
           </Button>
