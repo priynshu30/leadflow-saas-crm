@@ -24,6 +24,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const isAuthPage =
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
+    pathname.startsWith("/forgot-password") ||
     isAdminRoute;
 
   useEffect(() => {
