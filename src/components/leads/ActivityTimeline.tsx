@@ -91,11 +91,11 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
     <div className="space-y-6">
       {/* Log Activity Box */}
       <form onSubmit={handleSubmit} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => setActivityType("CALL")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
               activityType === "CALL"
                 ? "bg-blue-600 text-white shadow-2xs"
                 : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
@@ -106,7 +106,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
           <button
             type="button"
             onClick={() => setActivityType("WHATSAPP")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
               activityType === "WHATSAPP"
                 ? "bg-emerald-600 text-white shadow-2xs"
                 : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
@@ -117,7 +117,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
           <button
             type="button"
             onClick={() => setActivityType("EMAIL")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
               activityType === "EMAIL"
                 ? "bg-indigo-600 text-white shadow-2xs"
                 : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
@@ -128,7 +128,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
           <button
             type="button"
             onClick={() => setActivityType("NOTE")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
               activityType === "NOTE"
                 ? "bg-slate-800 text-white shadow-2xs"
                 : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
