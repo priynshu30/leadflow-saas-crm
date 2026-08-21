@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const filter = searchParams.get("filter") || "all"; // "all" | "today" | "active" | "completed"
     const leadId = searchParams.get("leadId");
+    const employeeId = searchParams.get("employeeId");
 
     const currentUser = await prisma.user.findUnique({
       where: { id: session.userId },
@@ -23,9 +24,11 @@ export async function GET(req: NextRequest) {
       businessId: session.businessId,
     };
 
-    // If not admin, only show user's own visits
+    // If not admin, strictly isolate to user's own visits
     if (!isAdmin) {
       whereClause.userId = session.userId;
+    } else if (employeeId && employeeId !== "all") {
+      whereClause.userId = parseInt(employeeId, 10);
     }
 
     if (leadId) {
