@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { getLeads, createLead, checkDuplicatePhone } from "@/server/leads/service";
 import { createLeadSchema } from "@/lib/validations";
 import { LeadStatus } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,13 +19,17 @@ export async function GET(req: NextRequest) {
       ? parseInt(searchParams.get("assignedUserId")!, 10)
       : undefined;
 
+    // Permission: agents without canViewAllLeads only see their own leads
+    const currentUser = await prisma.user.findUnique({ where: { id: session.userId } });
+    const restrictToOwn = currentUser?.role !== "ADMIN" && !currentUser?.canViewAllLeads;
+
     const result = await getLeads(session.businessId, {
       page,
       limit,
       search,
       status,
       source,
-      assignedUserId,
+      assignedUserId: restrictToOwn ? session.userId : assignedUserId,
     });
 
     return NextResponse.json(result);
@@ -40,6 +45,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await requireSession();
+
+    // Permission check: agents need canAddLeads permission
+    const currentUser = await prisma.user.findUnique({ where: { id: session.userId } });
+    if (currentUser?.role !== "ADMIN" && !currentUser?.canAddLeads) {
+      return NextResponse.json(
+        { error: "You don't have permission to add leads. Ask your admin to grant you access." },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const validated = createLeadSchema.parse(body);
 

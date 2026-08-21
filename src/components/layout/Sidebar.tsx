@@ -14,6 +14,8 @@ import {
   Building2,
   PhoneCall,
   Inbox,
+  Camera,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SessionUser } from "@/types";
@@ -34,10 +36,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ user, onOpenQuickAdd }) => {
     router.refresh();
   };
 
+  const isAdmin = (user as any)?.role === "ADMIN";
+
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "Leads", href: "/leads", icon: Users },
     { label: "Follow-ups", href: "/follow-ups", icon: CalendarClock },
+    { label: "Attendance", href: "/attendance", icon: Camera },
+    ...(isAdmin ? [{ label: "Team", href: "/employees", icon: UserCog }] : []),
     { label: "Inbox", href: "/inbox", icon: Inbox },
     { label: "Reports", href: "/reports", icon: BarChart3 },
     { label: "Settings", href: "/settings", icon: Settings },

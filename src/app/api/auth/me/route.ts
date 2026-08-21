@@ -21,6 +21,9 @@ export async function GET() {
           email: true,
           phone: true,
           avatarUrl: true,
+          role: true,
+          canAddLeads: true,
+          canViewAllLeads: true,
         },
       }),
     ]);
@@ -28,9 +31,13 @@ export async function GET() {
     return NextResponse.json({
       user: {
         ...session,
+        id: user?.id,
         name: user?.name || session.name,
         avatarUrl: user?.avatarUrl || null,
         phone: user?.phone || null,
+        role: user?.role || "ADMIN",
+        canAddLeads: user?.canAddLeads ?? true,
+        canViewAllLeads: user?.canViewAllLeads ?? true,
       },
       business,
     });

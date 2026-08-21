@@ -76,24 +76,76 @@ model Business {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  businessId    Int
-  name          String
-  email         String         @unique
-  phone         String?
-  avatarUrl     String?        @db.MediumText
-  passwordHash  String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id              Int            @id @default(autoincrement())
+  businessId      Int
+  name            String
+  email           String         @unique
+  phone           String?
+  avatarUrl       String?        @db.MediumText
+  role            String         @default("ADMIN") // "ADMIN" | "AGENT"
+  canAddLeads     Boolean        @default(true)
+  canViewAllLeads Boolean        @default(true)
+  passwordHash    String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-  business      Business       @relation(fields: [businessId], references: [id])
-  leads         Lead[]
-  followUps     FollowUp[]
-  activities    LeadActivity[]
-  notifications Notification[]
-  loginLogs     LoginLog[]
+  business        Business       @relation(fields: [businessId], references: [id])
+  leads           Lead[]
+  followUps       FollowUp[]
+  activities      LeadActivity[]
+  notifications   Notification[]
+  loginLogs       LoginLog[]
+  attendances     Attendance[]
+  workProofs      WorkProof[]
 
   @@index([businessId])
+}
+
+model Attendance {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  businessId      Int
+  date            String    // YYYY-MM-DD
+  sodTime         DateTime?
+  sodSelfieUrl    String?   @db.MediumText
+  sodLat          Float?
+  sodLng          Float?
+  sodLocationName String?
+  eodTime         DateTime?
+  eodSelfieUrl    String?   @db.MediumText
+  eodLat          Float?
+  eodLng          Float?
+  eodLocationName String?
+  eodSummary      String?   @db.Text
+  status          String    @default("CLOCKED_IN") // "CLOCKED_IN" | "CLOCKED_OUT"
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, date])
+  @@index([businessId, date])
+}
+
+model WorkProof {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  businessId   Int
+  leadId       Int?
+  title        String
+  description  String?  @db.Text
+  imageUrl     String?  @db.MediumText
+  audioUrl     String?  @db.MediumText
+  latitude     Float?
+  longitude    Float?
+  locationName String?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([businessId])
+  @@index([leadId])
 }
 
 model LoginLog {

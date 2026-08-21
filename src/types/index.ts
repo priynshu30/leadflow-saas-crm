@@ -28,6 +28,7 @@ export type FollowUpBucket =
   | "completed";
 
 export interface SessionUser {
+  id?: number;
   userId: number;
   businessId: number;
   email: string;
@@ -36,6 +37,9 @@ export interface SessionUser {
   businessType: BusinessType;
   avatarUrl?: string | null;
   phone?: string | null;
+  role?: "ADMIN" | "AGENT";
+  canAddLeads?: boolean;
+  canViewAllLeads?: boolean;
 }
 
 export interface BusinessSettings {
