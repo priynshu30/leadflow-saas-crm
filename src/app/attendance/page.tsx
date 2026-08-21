@@ -17,7 +17,9 @@ import {
   Timer,
   ExternalLink,
   Music,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { SelfieLocationCapture } from "@/components/attendance/SelfieLocationCapture";
@@ -177,15 +179,59 @@ export default function AttendancePage() {
       const audio = new Audio(url);
       audio.onended = () => setPlayingAudio(null);
       setAudioPlayers((prev) => ({ ...prev, [id]: audio }));
-      audio.play().catch(() => showToast("Failed to play audio", "error"));
+      audio.play().catch(() => showToast("Could not play audio", "error"));
       setPlayingAudio(id);
     } else if (playingAudio === id) {
       audioPlayers[id].pause();
       setPlayingAudio(null);
     } else {
-      audioPlayers[id].play().catch(() => showToast("Failed to play audio", "error"));
+      audioPlayers[id].play().catch(() => showToast("Could not play audio", "error"));
       setPlayingAudio(id);
     }
+  };
+
+  const handleExportExcel = () => {
+    const recordsToExport =
+      userRole === "ADMIN" && teamAttendance.length > 0
+        ? teamAttendance
+        : myAttendance
+        ? [myAttendance]
+        : [];
+
+    if (recordsToExport.length === 0) {
+      showToast("No attendance data to export", "error");
+      return;
+    }
+
+    const rows = recordsToExport.map((rec) => {
+      let durationStr = "—";
+      if (rec.sodTime) {
+        const sod = new Date(rec.sodTime);
+        const end = rec.eodTime ? new Date(rec.eodTime) : new Date();
+        const diffMs = end.getTime() - sod.getTime();
+        const hours = Math.floor(diffMs / 3600000);
+        const mins = Math.floor((diffMs % 3600000) / 60000);
+        durationStr = `${hours}h ${mins}m`;
+      }
+      return {
+        "Employee Name": rec.user?.name || "Self",
+        Email: rec.user?.email || "—",
+        Date: format(new Date(), "yyyy-MM-dd"),
+        Status: rec.status === "CLOCKED_IN" ? "Clocked In (Working)" : "Clocked Out",
+        "Clock In (SOD)": rec.sodTime ? format(new Date(rec.sodTime), "hh:mm a") : "—",
+        "SOD Location": rec.sodLocationName || "—",
+        "Clock Out (EOD)": rec.eodTime ? format(new Date(rec.eodTime), "hh:mm a") : "—",
+        "EOD Location": rec.eodLocationName || "—",
+        "Total Shift Duration": durationStr,
+        "EOD Work Summary": rec.eodSummary || "—",
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Report");
+    XLSX.writeFile(workbook, `Attendance_Report_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    showToast("Attendance Excel downloaded successfully!", "success");
   };
 
   const isClocked = !!myAttendance;
@@ -277,9 +323,19 @@ export default function AttendancePage() {
             <h1 className="text-2xl font-bold text-slate-900">Field Attendance & Work Proofs</h1>
             <p className="text-sm text-slate-500 mt-0.5">{format(new Date(), "EEEE, dd MMMM yyyy")}</p>
           </div>
-          <Button onClick={() => setShowWorkProof(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-            <Plus className="h-3.5 w-3.5 mr-1.5" /> Log Work / Call Proof
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportExcel}
+              className="border-slate-300 text-slate-700 hover:bg-slate-100"
+            >
+              <Download className="h-3.5 w-3.5 mr-1.5 text-slate-600" /> Export Attendance (Excel)
+            </Button>
+            <Button onClick={() => setShowWorkProof(true)} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+              <Plus className="h-3.5 w-3.5 mr-1.5" /> Log Work / Call Proof
+            </Button>
+          </div>
         </div>
 
         {/* Today's Status Banner Card */}

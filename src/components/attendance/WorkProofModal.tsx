@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { X, Camera, Mic, MicOff, Square, Play, Pause, Upload, FileText, Music, MapPin, CheckCircle2 } from "lucide-react";
+import { X, Camera, Mic, Square, Play, Pause, Upload, FileText, Music, CheckCircle2, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toast";
@@ -10,9 +10,17 @@ interface WorkProofModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmitted: () => void;
+  defaultLeadId?: number | null;
+  defaultLeadName?: string | null;
 }
 
-export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalProps) {
+export function WorkProofModal({
+  isOpen,
+  onClose,
+  onSubmitted,
+  defaultLeadId,
+  defaultLeadName,
+}: WorkProofModalProps) {
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState("");
@@ -24,6 +32,8 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioMode, setAudioMode] = useState<"upload" | "record">("upload");
+  const [selectedLeadId, setSelectedLeadId] = useState<number | null>(defaultLeadId || null);
+  const [leadsList, setLeadsList] = useState<{ id: number; name: string; phone: string }[]>([]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -33,6 +43,22 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      // Fetch leads for optional tagging if not pre-set
+      if (!defaultLeadId) {
+        fetch("/api/leads?limit=50")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.leads) {
+              setLeadsList(data.leads);
+            }
+          })
+          .catch(() => {});
+      } else {
+        setSelectedLeadId(defaultLeadId);
+      }
+    }
+
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (audioPlayerRef.current) {
@@ -40,7 +66,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
         audioPlayerRef.current = null;
       }
     };
-  }, []);
+  }, [isOpen, defaultLeadId]);
 
   if (!isOpen) return null;
 
@@ -92,7 +118,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
         const reader = new FileReader();
         reader.onload = () => {
           setAudioUrl(reader.result as string);
-          setAudioFileName("Voice_Recording_" + new Date().toLocaleTimeString().replace(/\s+/g, "_") + ".webm");
+          setAudioFileName("Voice_Note_" + new Date().toLocaleTimeString().replace(/\s+/g, "_") + ".webm");
         };
         reader.readAsDataURL(blob);
         stream.getTracks().forEach((t) => t.stop());
@@ -104,7 +130,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
       timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
       showToast("Recording started...", "success");
     } catch {
-      showToast("Microphone permission denied or unavailable. Use 'Upload Audio File' instead.", "error");
+      showToast("Microphone permission denied. Use 'Upload Call Recording' instead.", "error");
     }
   };
 
@@ -183,6 +209,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
           description,
           imageUrl,
           audioUrl,
+          leadId: selectedLeadId || null,
           latitude: lat,
           longitude: lng,
           locationName,
@@ -214,7 +241,9 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
               <FileText className="h-4 w-4 text-indigo-600" /> Log Work & Field Proof
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Submit visit notes, site photos, call recordings & GPS proof
+              {defaultLeadName
+                ? `Tagging activity to client: ${defaultLeadName}`
+                : "Submit visit notes, site photos, call recordings & GPS proof"}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
@@ -223,10 +252,31 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Optional Lead / Client Tag */}
+          {!defaultLeadId && leadsList.length > 0 && (
+            <div>
+              <label className="text-xs font-semibold text-slate-700 block mb-1 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-indigo-600" /> Link to Client / Lead (Optional)
+              </label>
+              <select
+                value={selectedLeadId || ""}
+                onChange={(e) => setSelectedLeadId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">-- General Activity / Not Linked to Specific Lead --</option>
+                {leadsList.map((ld) => (
+                  <option key={ld.id} value={ld.id}>
+                    {ld.name} ({ld.phone})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <Input
-            label="Task / Meeting / Activity Title *"
+            label="Activity / Task Title *"
             type="text"
-            placeholder="e.g. Site Visit with Mr. Sharma / Client Discussion Call"
+            placeholder="e.g. Site Visit & Price Discussion / Client Call"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             leftIcon={<FileText className="h-4 w-4" />}
@@ -235,7 +285,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
 
           <div>
             <label className="text-xs font-semibold text-slate-700 block mb-1">
-              Work Description / Discussion Notes
+              Discussion Notes / Next Action
             </label>
             <textarea
               rows={3}
@@ -306,7 +356,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
               )}
             </div>
 
-            {/* Audio Options: Upload Call File vs Live Mic Record */}
+            {/* Audio Options */}
             {!audioUrl ? (
               <div className="space-y-2">
                 <div className="flex gap-2">
@@ -343,7 +393,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
                       onClick={() => audioFileInputRef.current?.click()}
                       className="text-xs border-dashed border-emerald-300 bg-emerald-50/60 text-emerald-700 hover:bg-emerald-100"
                     >
-                      <Upload className="h-3.5 w-3.5 mr-1.5" /> Choose Call Recording File (.mp3, .m4a, .wav)
+                      <Upload className="h-3.5 w-3.5 mr-1.5" /> Choose Call Recording (.mp3, .m4a, .wav)
                     </Button>
                     <input
                       ref={audioFileInputRef}
@@ -366,7 +416,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
                     >
                       {isRecording ? (
                         <>
-                          <Square className="h-3 w-3 mr-1.5 fill-current" /> Stop Recording ({formatTime(recordingTime)})
+                          <Square className="h-3 w-3 mr-1.5 fill-current" /> Stop ({formatTime(recordingTime)})
                         </>
                       ) : (
                         <>
@@ -398,7 +448,7 @@ export function WorkProofModal({ isOpen, onClose, onSubmitted }: WorkProofModalP
                 </Button>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-800 truncate">{audioFileName || "Attached Audio"}</p>
-                  <p className="text-[10px] text-emerald-600 font-medium">Ready to submit with proof</p>
+                  <p className="text-[10px] text-emerald-600 font-medium">Ready to attach to proof</p>
                 </div>
               </div>
             )}
