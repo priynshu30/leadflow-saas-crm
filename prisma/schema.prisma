@@ -72,6 +72,7 @@ model Business {
   emailMessages      EmailMessage[]
   loginLogs          LoginLog[]
   fieldVisits        FieldVisit[]
+  leaveRequests      LeaveRequest[]
 
   @@index([status])
 }
@@ -99,6 +100,7 @@ model User {
   attendances     Attendance[]
   workProofs      WorkProof[]
   fieldVisits     FieldVisit[]
+  leaveRequests   LeaveRequest[]
 
   @@index([businessId])
 }
@@ -330,3 +332,27 @@ model ReminderLog {
   channel    String   // "WHATSAPP" | "SMS"
   status     String   // "SENT" | "FAILED"
 }
+
+model LeaveRequest {
+  id             Int       @id @default(autoincrement())
+  businessId     Int
+  userId         Int
+  leaveType      String    // "CASUAL", "SICK", "EMERGENCY", "HALF_DAY", "PAID", "UNPAID"
+  startDate      String    // YYYY-MM-DD
+  endDate        String    // YYYY-MM-DD
+  totalDays      Float     @default(1.0)
+  reason         String    @db.Text
+  status         String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  adminNote      String?   @db.Text
+  approvedAt     DateTime?
+  approvedBy     Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  business       Business  @relation(fields: [businessId], references: [id])
+  user           User      @relation(fields: [userId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@index([userId, status])
+}
+

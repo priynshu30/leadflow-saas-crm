@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
-import { Building2, User, Sliders, ShieldCheck, ArrowRight, Users, Sparkles } from "lucide-react";
+import { Building2, User, Sliders, ShieldCheck, ArrowRight, Users, Sparkles, CalendarHeart } from "lucide-react";
 
 export default function SettingsHubPage() {
   const sections = [
@@ -12,6 +12,12 @@ export default function SettingsHubPage() {
       description: "Manage sales executives, view lead assignment workloads, and add new agents",
       href: "/employees",
       icon: Users,
+    },
+    {
+      title: "Leave Requests & Approvals",
+      description: "Apply for leaves, track approval status and manage team time-off",
+      href: "/leaves",
+      icon: CalendarHeart,
     },
     {
       title: "Business Profile & Niche Fields",
