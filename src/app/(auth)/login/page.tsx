@@ -98,38 +98,6 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {/* Quick Demo Accounts for Testing Multi-Tenancy */}
-          <div className="mt-6 pt-5 border-t border-slate-100 space-y-2.5">
-            <p className="text-xs font-bold text-slate-700 uppercase tracking-wider text-center">
-              1-Click Login Accounts
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("admin@gmail.com");
-                  setPassword("Root@123");
-                }}
-                className="p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/80 text-left transition-all"
-              >
-                <span className="font-bold text-xs text-indigo-900 block truncate">⚡ Priyanshu Kumar</span>
-                <span className="text-[10px] text-indigo-700 block">admin@gmail.com</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("amit@apexrealty.in");
-                  setPassword("password123");
-                }}
-                className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-left transition-all"
-              >
-                <span className="font-bold text-xs text-slate-900 block truncate">🏢 Apex Realty</span>
-                <span className="text-[10px] text-slate-600 block">amit@apexrealty.in</span>
-              </button>
-            </div>
-          </div>
-
           <div className="mt-6 text-center text-xs text-slate-500 space-y-3">
             <div>
               Don't have a business account?{" "}

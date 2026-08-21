@@ -10,8 +10,8 @@ import { useToast } from "@/components/ui/Toast";
 export default function SuperAdminLoginPage() {
   const router = useRouter();
   const { showToast } = useToast();
-  const [email, setEmail] = useState("admin@leadflow.in");
-  const [password, setPassword] = useState("SuperAdmin@123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 

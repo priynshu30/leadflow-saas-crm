@@ -13,9 +13,22 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const validated = forgotPasswordSchema.parse(body);
 
-    const user = await prisma.user.findUnique({
-      where: { email: validated.email.toLowerCase().trim() },
+    const emailClean = validated.email.toLowerCase().trim();
+
+    let user = await prisma.user.findFirst({
+      where: {
+        email: { equals: emailClean },
+      },
     });
+
+    if (!user) {
+      // Try insensitive lookup fallback
+      user = await prisma.user.findFirst({
+        where: {
+          email: { equals: emailClean, mode: "insensitive" },
+        },
+      });
+    }
 
     if (!user) {
       return NextResponse.json(
