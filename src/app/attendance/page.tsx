@@ -59,6 +59,7 @@ interface WorkProofRecord {
 export default function AttendancePage() {
   const { showToast } = useToast();
   const [myAttendance, setMyAttendance] = useState<AttendanceRecord | null>(null);
+  const [myTodayProofsCount, setMyTodayProofsCount] = useState<number>(0);
   const [teamAttendance, setTeamAttendance] = useState<AttendanceRecord[]>([]);
   const [workProofs, setWorkProofs] = useState<WorkProofRecord[]>([]);
   const [userRole, setUserRole] = useState<"ADMIN" | "AGENT">("AGENT");
@@ -84,6 +85,7 @@ export default function AttendancePage() {
       if (attRes.ok) {
         const att = await attRes.json();
         setMyAttendance(att.myTodayAttendance);
+        setMyTodayProofsCount(att.myTodayProofsCount || 0);
         setTeamAttendance(att.teamTodayAttendance || []);
         setUserRole(att.userRole === "ADMIN" ? "ADMIN" : "AGENT");
       }
@@ -151,8 +153,21 @@ export default function AttendancePage() {
     setShowEodSummary(true);
   };
 
+  const startEODFlow = () => {
+    if (myTodayProofsCount === 0) {
+      showToast("⚠️ Work proof required! You must log at least 1 work proof (photo or recording) before clocking out.", "error");
+      setShowWorkProof(true);
+      return;
+    }
+    setShowSelfieCapture("EOD");
+  };
+
   const handleEODSubmit = async () => {
     if (!pendingEodData) return;
+    if (!eodSummary.trim() || eodSummary.trim().length < 5) {
+      showToast("Please write an EOD work summary (minimum 5 characters).", "error");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/attendance", {
@@ -163,7 +178,7 @@ export default function AttendancePage() {
           eodLat: pendingEodData.lat,
           eodLng: pendingEodData.lng,
           eodLocationName: pendingEodData.locationName,
-          eodSummary,
+          eodSummary: eodSummary.trim(),
         }),
       });
       const text = await res.text();
@@ -173,7 +188,13 @@ export default function AttendancePage() {
       } catch {
         throw new Error(res.status === 413 ? "Photo is too large. Please retake photo." : `Server error (${res.status})`);
       }
-      if (!res.ok) throw new Error(result.error || "Failed to clock out");
+      if (!res.ok) {
+        if (result.needsWorkProof) {
+          setShowEodSummary(false);
+          setShowWorkProof(true);
+        }
+        throw new Error(result.error || "Failed to clock out");
+      }
       showToast("✅ Clocked Out (EOD) successfully!", "success");
       setShowEodSummary(false);
       setEodSummary("");
@@ -279,15 +300,28 @@ export default function AttendancePage() {
       {showEodSummary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 p-6 space-y-4">
-            <h2 className="font-bold text-slate-900 text-base">📝 End of Day (EOD) Summary</h2>
-            <p className="text-xs text-slate-500">Briefly summarize the work and client meetings done today</p>
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-slate-900 text-base">📝 End of Day (EOD) Summary</h2>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                {myTodayProofsCount} Proofs Attached
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Summarize your tasks, customer visits, calls and conversions for today
+            </p>
             <textarea
               rows={4}
               value={eodSummary}
               onChange={(e) => setEodSummary(e.target.value)}
               placeholder="e.g. Completed 4 client calls, 1 site visit, converted 1 lead..."
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              required
             />
+            {myTodayProofsCount === 0 && (
+              <p className="text-[11px] text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200 font-medium">
+                ⚠️ You must log at least 1 work proof (photo or recording) before clocking out.
+              </p>
+            )}
             <div className="flex gap-2">
               <Button variant="secondary" className="flex-1" size="sm" onClick={() => setShowEodSummary(false)}>
                 Back
@@ -296,6 +330,7 @@ export default function AttendancePage() {
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
                 size="sm"
                 loading={submitting}
+                disabled={!eodSummary.trim() || eodSummary.trim().length < 5}
                 onClick={handleEODSubmit}
               >
                 Complete Clock-Out
@@ -417,7 +452,7 @@ export default function AttendancePage() {
               )}
               {isClocked && !isClockedOut && (
                 <Button
-                  onClick={() => setShowSelfieCapture("EOD")}
+                  onClick={startEODFlow}
                   loading={submitting}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                 >

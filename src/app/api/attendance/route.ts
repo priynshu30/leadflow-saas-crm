@@ -10,21 +10,32 @@ export async function GET(req: NextRequest) {
     }
 
     const todayStr = new Date().toISOString().split("T")[0];
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
     // Today's attendance for current user
-    const myTodayAttendance = await prisma.attendance.findFirst({
-      where: {
-        userId: session.userId,
-        date: todayStr,
-      },
-    });
+    const [myTodayAttendance, myTodayProofsCount, currentUser] = await Promise.all([
+      prisma.attendance.findFirst({
+        where: {
+          userId: session.userId,
+          date: todayStr,
+        },
+      }),
+      prisma.workProof.count({
+        where: {
+          userId: session.userId,
+          createdAt: {
+            gte: startOfToday,
+          },
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: session.userId },
+      }),
+    ]);
 
     // If admin, fetch all team attendance for today
     let teamTodayAttendance: any[] = [];
-    const currentUser = await prisma.user.findUnique({
-      where: { id: session.userId },
-    });
-
     if (currentUser?.role === "ADMIN") {
       teamTodayAttendance = await prisma.attendance.findMany({
         where: {
@@ -48,6 +59,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       myTodayAttendance,
+      myTodayProofsCount,
       teamTodayAttendance,
       userRole: currentUser?.role || "AGENT",
     });
@@ -133,6 +145,36 @@ export async function PATCH(req: NextRequest) {
     const { eodSelfieUrl, eodLat, eodLng, eodLocationName, eodSummary } = body;
 
     const todayStr = new Date().toISOString().split("T")[0];
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    // 1. Mandatory Work Proof Check: Employee must have submitted at least 1 work proof today
+    const todayProofsCount = await prisma.workProof.count({
+      where: {
+        userId: session.userId,
+        createdAt: {
+          gte: startOfToday,
+        },
+      },
+    });
+
+    if (todayProofsCount === 0) {
+      return NextResponse.json(
+        {
+          error: "Work proof is required before EOD clock-out! Please submit at least 1 work proof (client visit photo or call recording) before clocking out.",
+          needsWorkProof: true,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. Mandatory EOD Summary Check
+    if (!eodSummary || !eodSummary.trim() || eodSummary.trim().length < 5) {
+      return NextResponse.json(
+        { error: "Please write a brief End-of-Day (EOD) work summary (at least 5 characters)." },
+        { status: 400 }
+      );
+    }
 
     const attendance = await prisma.attendance.findFirst({
       where: {
@@ -163,7 +205,7 @@ export async function PATCH(req: NextRequest) {
         eodLat: eodLat ? parseFloat(eodLat) : null,
         eodLng: eodLng ? parseFloat(eodLng) : null,
         eodLocationName: eodLocationName || "GPS Location Captured",
-        eodSummary: eodSummary || "End of day completed",
+        eodSummary: eodSummary.trim(),
         status: "CLOCKED_OUT",
       },
     });
