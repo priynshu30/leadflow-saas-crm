@@ -16,17 +16,10 @@ export async function POST(req: NextRequest) {
 
     const emailClean = validated.email.toLowerCase().trim();
 
-    let user = await prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: { email: emailClean },
       include: { business: true },
     });
-
-    if (!user) {
-      user = await prisma.user.findFirst({
-        where: { email: { equals: emailClean, mode: "insensitive" } },
-        include: { business: true },
-      });
-    }
 
     if (!user) {
       // Log failed attempt (user not found)

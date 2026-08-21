@@ -15,20 +15,11 @@ export async function POST(req: NextRequest) {
 
     const emailClean = validated.email.toLowerCase().trim();
 
-    let user = await prisma.user.findFirst({
+    const user = await prisma.user.findFirst({
       where: {
-        email: { equals: emailClean },
+        email: emailClean,
       },
     });
-
-    if (!user) {
-      // Try insensitive lookup fallback
-      user = await prisma.user.findFirst({
-        where: {
-          email: { equals: emailClean, mode: "insensitive" },
-        },
-      });
-    }
 
     if (!user) {
       return NextResponse.json(
