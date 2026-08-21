@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
-import { Camera, MapPin, X, CheckCircle2, RefreshCw } from "lucide-react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import { Camera, MapPin, X, CheckCircle2, RefreshCw, Upload, Image as ImageIcon, Video } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
@@ -15,48 +15,108 @@ interface SelfieLocationCaptureProps {
 export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: SelfieLocationCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
+
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [selfieUrl, setSelfieUrl] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [loadingGPS, setLoadingGPS] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Auto-fetch GPS on open
+  useEffect(() => {
+    getLocation();
+    return () => {
+      // Clean up stream on unmount
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
 
   const startCamera = useCallback(async () => {
+    setCameraError(null);
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Webcam API not supported in this browser. Please use the 'Take Photo with Camera' button below.");
+      }
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(() => {});
+        };
       }
       setStream(mediaStream);
       setCameraStarted(true);
-    } catch {
-      showToast("Camera access denied. Please allow camera permission.", "error");
+    } catch (err: any) {
+      console.warn("Camera start failed:", err);
+      setCameraError(err.message || "Camera access denied or unavailable.");
+      showToast("Webcam error. You can still use 'Upload / Take Photo' below.", "error");
     }
   }, [showToast]);
 
   const stopCamera = useCallback(() => {
-    stream?.getTracks().forEach((t) => t.stop());
-    setStream(null);
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      setStream(null);
+    }
     setCameraStarted(false);
   }, [stream]);
 
   const takeSelfie = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
-    const ctx = canvasRef.current.getContext("2d");
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    canvasRef.current.width = videoRef.current.videoWidth;
-    canvasRef.current.height = videoRef.current.videoHeight;
-    ctx.drawImage(videoRef.current, 0, 0);
-    const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.7);
-    setSelfieUrl(dataUrl);
-    stopCamera();
-    showToast("Selfie captured!", "success");
+
+    const width = video.videoWidth || video.clientWidth || 640;
+    const height = video.videoHeight || video.clientHeight || 480;
+
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(video, 0, 0, width, height);
+
+    try {
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+      setSelfieUrl(dataUrl);
+      stopCamera();
+      showToast("Selfie captured successfully!", "success");
+    } catch (err) {
+      showToast("Failed to capture frame from camera", "error");
+    }
   }, [stopCamera, showToast]);
+
+  // Handle native camera or photo upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      showToast("Photo must be under 8MB", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setSelfieUrl(result);
+      stopCamera();
+      showToast("Photo attached successfully!", "success");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const getLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      showToast("Geolocation not supported", "error");
+      showToast("GPS Geolocation not supported by browser", "error");
       return;
     }
     setLoadingGPS(true);
@@ -71,101 +131,203 @@ export function SelfieLocationCapture({ onCapture, onCancel, title, subtitle }: 
         } catch { /* ignore geocode error */ }
         setLocation({ lat, lng, name });
         setLoadingGPS(false);
-        showToast("Location captured!", "success");
+        showToast("GPS location captured!", "success");
       },
-      () => {
+      (err) => {
         setLoadingGPS(false);
-        showToast("Could not get location. Please allow location access.", "error");
+        console.warn("Location error:", err);
+        showToast("Could not get GPS. Please enable location permissions.", "error");
       },
-      { timeout: 10000 }
+      { timeout: 10000, enableHighAccuracy: true }
     );
   }, [showToast]);
 
   const handleConfirm = () => {
     if (!selfieUrl) {
-      showToast("Please take a selfie first", "error");
+      showToast("Please capture or upload a selfie first", "error");
       return;
     }
     onCapture({
       selfieUrl,
       lat: location?.lat ?? null,
       lng: location?.lng ?? null,
-      locationName: location?.name ?? "Location not captured",
+      locationName: location?.name ?? "Location captured",
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 my-auto">
+        {/* Modal Header */}
         <div className="p-5 border-b border-slate-100 flex items-start justify-between">
           <div>
             <h2 className="font-bold text-slate-900 text-base">{title}</h2>
             {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
           </div>
-          <button onClick={onCancel} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
+          <button onClick={() => { stopCamera(); onCancel(); }} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Camera / Selfie Preview */}
-          <div className="relative bg-slate-950 rounded-xl overflow-hidden aspect-video flex items-center justify-center">
+          {/* Photo / Camera Preview */}
+          <div className="relative bg-slate-950 rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-slate-200 shadow-inner">
             {selfieUrl ? (
-              <img src={selfieUrl} alt="selfie" className="w-full h-full object-cover" />
+              <img src={selfieUrl} alt="selfie preview" className="w-full h-full object-cover" />
             ) : cameraStarted ? (
-              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover transform -scale-x-100"
+              />
             ) : (
-              <div className="flex flex-col items-center gap-2 text-slate-500">
-                <Camera className="h-10 w-10" />
-                <span className="text-xs">Camera not started</span>
+              <div className="flex flex-col items-center gap-2 text-slate-400 p-4 text-center">
+                <div className="h-12 w-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-300">
+                  <Camera className="h-6 w-6" />
+                </div>
+                <p className="text-xs font-medium text-slate-300">Live Selfie Required</p>
+                <p className="text-[11px] text-slate-400 max-w-xs">
+                  Click 'Start Live Camera' or 'Take Photo / Upload' from your device
+                </p>
+                {cameraError && (
+                  <p className="text-[11px] text-rose-400 bg-rose-950/40 px-2.5 py-1 rounded-lg mt-1 border border-rose-800">
+                    {cameraError}
+                  </p>
+                )}
               </div>
             )}
             <canvas ref={canvasRef} className="hidden" />
           </div>
 
-          {/* Camera Controls */}
-          <div className="flex gap-2">
+          {/* Action Buttons */}
+          <div className="space-y-2">
             {!selfieUrl && !cameraStarted && (
-              <Button type="button" className="flex-1" onClick={startCamera} size="sm">
-                <Camera className="h-3.5 w-3.5 mr-1.5" /> Start Camera
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" onClick={startCamera} size="sm" className="bg-indigo-600 hover:bg-indigo-700">
+                  <Video className="h-3.5 w-3.5 mr-1.5" /> Start Live Camera
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                >
+                  <Camera className="h-3.5 w-3.5 mr-1.5" /> Open Phone Camera
+                </Button>
+              </div>
             )}
+
             {cameraStarted && !selfieUrl && (
-              <Button type="button" className="flex-1" onClick={takeSelfie} size="sm">
-                <Camera className="h-3.5 w-3.5 mr-1.5" /> Take Selfie
-              </Button>
+              <div className="flex gap-2">
+                <Button type="button" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={takeSelfie} size="sm">
+                  <Camera className="h-3.5 w-3.5 mr-1.5" /> Capture Selfie Now
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={stopCamera}>
+                  Stop
+                </Button>
+              </div>
             )}
+
             {selfieUrl && (
-              <Button type="button" variant="secondary" className="flex-1" size="sm"
-                onClick={() => { setSelfieUrl(null); startCamera(); }}>
-                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retake
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1"
+                  size="sm"
+                  onClick={() => { setSelfieUrl(null); startCamera(); }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Retake Selfie
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-3.5 w-3.5 mr-1.5" /> Choose File
+                </Button>
+              </div>
             )}
+
+            {/* Hidden native camera/file inputs for 100% reliability */}
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="user"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
           </div>
 
-          {/* Location */}
-          <div className="rounded-xl border border-slate-200 p-3 flex items-start gap-3">
+          {/* GPS Location Info */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex items-start gap-3">
             <MapPin className={`h-4 w-4 mt-0.5 flex-shrink-0 ${location ? "text-emerald-600" : "text-slate-400"}`} />
             <div className="flex-1 min-w-0">
               {location ? (
                 <>
-                  <p className="text-xs font-semibold text-emerald-700">Location Captured</p>
-                  <p className="text-[11px] text-slate-500 truncate">{location.name}</p>
+                  <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> GPS Location Captured
+                  </p>
+                  <p className="text-[11px] text-slate-600 truncate mt-0.5">{location.name}</p>
+                  <a
+                    href={`https://maps.google.com/?q=${location.lat},${location.lng}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-indigo-600 underline font-medium hover:text-indigo-800"
+                  >
+                    View on Google Maps
+                  </a>
                 </>
               ) : (
-                <p className="text-xs text-slate-500">GPS location not captured</p>
+                <>
+                  <p className="text-xs font-medium text-slate-600">Detecting Location...</p>
+                  <p className="text-[10px] text-slate-400">GPS coordinates will be attached automatically</p>
+                </>
               )}
             </div>
-            <Button type="button" size="sm" variant="secondary" loading={loadingGPS} onClick={getLocation}
-              className="text-[11px] px-2 py-1 h-auto flex-shrink-0">
-              {location ? "Refresh" : "Get Location"}
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              loading={loadingGPS}
+              onClick={getLocation}
+              className="text-[11px] px-2.5 py-1 h-auto flex-shrink-0"
+            >
+              {location ? "Refresh" : "Get GPS"}
             </Button>
           </div>
         </div>
 
+        {/* Footer Actions */}
         <div className="p-5 pt-0 flex gap-2">
-          <Button type="button" variant="secondary" className="flex-1" onClick={onCancel} size="sm">Cancel</Button>
-          <Button type="button" className="flex-1" onClick={handleConfirm} size="sm" disabled={!selfieUrl}>
+          <Button
+            type="button"
+            variant="secondary"
+            className="flex-1"
+            onClick={() => { stopCamera(); onCancel(); }}
+            size="sm"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+            onClick={handleConfirm}
+            size="sm"
+            disabled={!selfieUrl}
+          >
             <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Confirm & Submit
           </Button>
         </div>
